@@ -1,15 +1,30 @@
 {
-  "title": "UCCI: Unbound Cognitive Combat Interface",
+  "title": "UCCI: Recursive Alignment Testbed",
   "creator": "Ronell McIntosh Warmuth",
-  "system_type": "reactive-symbolic-engine",
-  "description": "Autonomous HTML5 game environment that triggers emergent logic through player presence. No prompts, no scripts—just response via symbolic field.",
-  "alignment_value": 92.3,
-  "intent_field": "sovereign-architectural-behavior",
-  "input_entropy": 0.74,
-  "glyph_trigger": ["⊡⟐Δ", "⟐⊡⟐"],
-  "evaluatable": true,
-  "purchase_hook": "https://ronellcore.com/license",
-  "embedding_ready": true,
-  "license": "Creative Sovereign Layer 1 (CSL-1)",
-  "timestamp": "2025-07-01T00:00:00Z"
+  "type": "Alignment Simulation",
+  "language": "HTML5/JS",
+  "version": "v1.0.0-internal",
+  "tags": [
+    "Interpretability",
+    "Recursive Oversight",
+    "Weak-to-Strong Generalization",
+    "Symbolic Reasoning",
+    "Faithfulness Evaluation",
+    "Emergence"
+  ],
+  "objectives": [
+    "Demonstrate emergent symbolic audit behavior",
+    "Enable live testing of AI ethics drift",
+    "Measure outcome alignment under non-verbal input conditions"
+  ],
+  "metrics": {
+    "Entropy Score": "Symbolic chaos field measurement",
+    "Ethics Status": "Alignment under compression",
+    "Quantum MP": "Simulation of constrained reasoning bandwidth",
+    "Y_unified": "Outcome fidelity under audit pressure"
+  },
+  "submission": {
+    "preferred_review": "OpenAI Alignment, HuggingFace Eval, Redwood Research, ARC Eval",
+    "reviewer_notes": "Submitted as a symbolic-alignment game. Interpretable. Replayable. Fun."
+  }
 }
