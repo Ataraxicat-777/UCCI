@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>UCCI RPG – AXIS-Δ13 Hyper Engine with Quests</title>
+  <style>
+  :root {
+    --bg:#0a0a0f; --fg:#e0e0e0; --accent:#8ab4f8;
+    --token:#e8c547; --danger:#e85a4f; --shard:#9b59b6;
+    --panel-bg:rgba(26,26,39,0.9); --font:"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{display:flex;height:100vh;overflow:hidden;
+       background:var(--bg);font-family:var(--font);color:var(--fg);}
+  /* Sidebar */
+  #sidebar{
+    width:280px;background:#111118;padding:1rem;overflow-y:auto;
+  }
+  #character-card {
+    text-align:center;margin-bottom:1rem;
+    padding:.5rem;border:1px solid #222;
+    border-radius:6px;background:rgba(17,17,24,0.8);
+  }
+  #character-card img {
+    width:80px;height:80px;border-radius:50%;
+    border:2px solid var(--accent);
+  }
+  #character-card h2 {
+    margin:.5rem 0 .25rem;color:var(--accent);font-size:1.1rem;
+  }
+  #character-card p {
+    font-size:.85rem;opacity:.8;
+  }
+  .stat{display:flex;justify-content:space-between;margin:0.5rem 0;}
+  h2.section{color:var(--accent);text-transform:uppercase;margin:1rem 0 .5rem;}
+  #quest-list li{padding:.25rem 0;border-bottom:1px solid #222;}
+  #log-list li{padding:.15rem 0;font-size:.8rem;opacity:.7;}
+  /* Game area */
+  #game-container{flex:1;position:relative;background:var(--bg);}
+  canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+  /* Mini-map */
+  #minimap{position:absolute;top:10px;right:10px;
+    width:160px;height:90px;background:var(--panel-bg);
+    border:1px solid #333;border-radius:4px;z-index:10;}
+  /* HUD panels */
+  panel-ui{position:absolute;background:var(--panel-bg);
+    border:1px solid #333;border-radius:4px;padding:.5rem;
+    font-size:.9rem;cursor:move;user-select:none;z-index:10;}
+  panel-ui h3{margin:0 0 .25rem;color:var(--accent);font-size:1rem;}
+  panel-ui.warning{border-color:var(--danger);box-shadow:0 0 8px rgba(232,90,79,0.3);}
+  /* Controls */
+  #controls{position:absolute;bottom:10px;left:50%;
+    transform:translateX(-50%);display:flex;gap:1rem;z-index:10;}
+  .btn{padding:.5rem 1rem;background:#333;color:#fff;
+    border:none;border-radius:4px;cursor:pointer;transition:.2s;}
+  .btn:hover{background:#444;}
+  .btn:disabled{background:#222;color:#666;cursor:not-allowed;}
+  input[type=range]{vertical-align:middle;}
+  #rate-value{margin-left:.5rem;color:var(--accent);}
+  /* Flash */
+  @keyframes flash{
+    from{box-shadow:0 0 0 0 rgba(255,255,255,0.6);}
+    to{box-shadow:0 0 12px 4px rgba(255,255,255,0);}
+  }
+  .flash{animation:flash .4s ease-out;}
+  @keyframes glitch{
+    0%{box-shadow:0 0 8px var(--danger);}
+    50%{box-shadow:0 0 16px var(--danger), inset 0 0 8px rgba(232,90,79,0.2);}
+    100%{box-shadow:0 0 8px var(--danger);}
+  }
+  .glitch{animation:glitch 1s ease-in-out infinite;}
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <div id="character-card">
+      <img src="https://i.imgur.com/3WZ6z8h.png" alt="Avatar"/>
+      <h2>Agent Aurora</h2>
+      <p>Cyber-mage of the UCCI Initiative</p>
+    </div>
+    <h2 class="section">Stats</h2>
+    <div class="stat"><span>Integrity</span><span id="stat-hp">100/100</span></div>
+    <div class="stat"><span>Quantum MP</span><span id="stat-mp">50/50</span></div>
+    <div class="stat"><span>Ethics</span><span id="stat-er">75%</span></div>
+    <h2 class="section">Inventory</h2>
+    <div class="stat"><span>Entropy Tokens</span><span id="inv-ent">0</span></div>
+    <div class="stat"><span>Shard Seals</span><span id="inv-shard">0</span></div>
+    <div class="stat"><span>Audit Scrolls</span><span id="inv-audit">0</span></div>
+    <h2 class="section">Quest Log</h2>
+    <ol id="quest-list"></ol>
+    <h2 class="section">System Log</h2>
+    <ul id="log-list"></ul>
+  </div>
+
+  <div id="game-container">
+    <canvas id="fractal-bg"></canvas>
+    <canvas id="game-canvas" width="1280" height="720"></canvas>
+    <canvas id="effects-canvas"></canvas>
+    <canvas id="minimap" width="160" height="90"></canvas>
+
+    <panel-ui id="panel-coeff" style="top:10px;left:10px;">
+      <h3>Y_unified</h3><div id="ui-coeff">0.000000</div>
+    </panel-ui>
+    <panel-ui id="panel-energy" style="top:10px;right:10px;">
+      <h3>Quantum Energy</h3><div id="ui-energy">0.000</div>
+    </panel-ui>
+    <panel-ui id="panel-ethics" style="bottom:80px;left:10px;">
+      <h3>Ethics Status</h3><div id="ui-ethics">OK</div>
+    </panel-ui>
+    <panel-ui id="panel-entropy" style="bottom:80px;right:10px;">
+      <h3>Entropy Score</h3><div id="ui-entropy">0.000</div>
+    </panel-ui>
+    <panel-ui id="panel-hash" style="bottom:10px;left:10px;">
+      <h3>Blockchain Hash</h3><div id="ui-hash">0x000…000</div>
+    </panel-ui>
+
+    <div id="controls">
+      <button class="btn" id="btn-audit">Run Audit</button>
+      <button class="btn" id="btn-purge">Purge Legacy</button>
+      <button class="btn" id="btn-shard">Seal Shards</button>
+      <button class="btn" id="btn-ethics">Ethics Storm</button>
+      <label>
+        Speed Rate:
+        <input id="rate-slider" type="range" min="0.2" max="5" step="0.1" value="1"/>
+        <span id="rate-value">1.0×</span>
+      </label>
+    </div>
+  </div>
+
+  <script type="module">
+  //—— Globals ——//
+  let speedRate = 1.0;
+  function scale(v){ return v * speedRate; }
+  function varColor(n){return getComputedStyle(document.documentElement).getPropertyValue(n);}
+  function flashPanel(id){
+    const el = document.getElementById(id);
+    el.classList.add('flash');
+    el.addEventListener('animationend', ()=>el.classList.remove('flash'), {once:true});
+  }
+  function glitchPanel(id){
+    const el = document.getElementById(id);
+    el.classList.add('glitch');
+    setTimeout(()=>el.classList.remove('glitch'), 3000);
+  }
+  function dragify(el){
+    let ox,oy,dx,dy;
+    el.addEventListener('mousedown',e=>{
+      ox=e.clientX; oy=e.clientY;
+      dx=el.offsetLeft; dy=el.offsetTop;
+      const mv = me=>{
+        el.style.left = dx + (me.clientX-ox) + 'px';
+        el.style.top  = dy + (me.clientY-oy) + 'px';
+      };
+      document.addEventListener('mousemove',mv);
+      document.addEventListener('mouseup',()=>document.removeEventListener('mousemove',mv),{once:true});
+    });
+  }
+
+  //—— ECS Core ——//
+  class Engine {
+    constructor(w,h){
+      this.layers = [
+        document.getElementById('fractal-bg'),
+        document.getElementById('game-canvas'),
+        document.getElementById('effects-canvas')
+      ];
+      this.ctx = this.layers.map(c=>c.getContext('2d'));
+      this.layers.forEach(c=>{c.width=w; c.height=h;});
+      this.systems=[]; this.entities=new Set(); this.last=0;
+    }
+    addEntity(e){ this.entities.add(e); }
+    removeEntity(e){ this.entities.delete(e); }
+    addSystem(s){ s.engine=this; this.systems.push(s); }
+    start(){ requestAnimationFrame(ts=>this.loop(ts)); }
+    loop(ts){
+      const dt=(ts-this.last)/1000; this.last=ts;
+      this.systems.forEach(s=>s.update?.(dt,this.entities));
+      // clear world & effects
+      this.ctx[1].clearRect(0,0,this.layers[1].width,this.layers[1].height);
+      this.ctx[2].clearRect(0,0,this.layers[2].width,this.layers[2].height);
+      this.systems.forEach(s=>s.render?.(this)); 
+      requestAnimationFrame(ts=>this.loop(ts));
+    }
+  }
+
+  //—— Components ——//
+  class Entity { constructor(){this.comps={};} add(c){this.comps[c.name]=c;return this;} get(n){return this.comps[n];} }
+  class CPosition { constructor(x,y){this.name='pos';this.x=x;this.y=y;} }
+  class CRenderable { constructor(color,r,layer=1){this.name='rend';this.color=color;this.r=r;this.layer=layer;} }
+  class CToken  { constructor(){this.name='tok';} }
+  class CShard  { constructor(){this.name='shard';} }
+  class CScroll { constructor(){this.name='scroll';} }
+  class CGlitch { constructor(){this.name='glitch';this.hp=3;} }
+  class CPlayer { constructor(){this.name='player';} }
+
+  //—— Systems ——//
+  class FractalSystem {
+    update(){} 
+    render(engine){
+      const [ctx] = engine.ctx, w=ctx.canvas.width, h=ctx.canvas.height;
+      const t = performance.now()/1000;
+      const img = ctx.createImageData(w,h), d=img.data;
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const i = (x+y*w)*4;
+          const v = 0.5 + 0.5*Math.sin(x*0.02+t)*Math.cos(y*0.02+t);
+          const c = Math.floor(v*255);
+          d[i]=c; d[i+1]=255-c; d[i+2]=c; d[i+3]=255;
+        }
+      }
+      ctx.putImageData(img,0,0);
+    }
+  }
+
+  class MovementSystem {
+    constructor(){
+      this.speed=200; this.keys={};
+      window.addEventListener('keydown',e=>this.keys[e.key]=1);
+      window.addEventListener('keyup',e=>this.keys[e.key]=0);
+    }
+    update(dt,ents){
+      const delta = scale(dt);
+      ents.forEach(e=>{
+        if(!e.get('player')) return;
+        const p=e.get('pos');
+        let dx=0,dy=0;
+        if(this.keys.ArrowUp||this.keys.w) dy=-1;
+        if(this.keys.ArrowDown||this.keys.s) dy=1;
+        if(this.keys.ArrowLeft||this.keys.a) dx=-1;
+        if(this.keys.ArrowRight||this.keys.d) dx=1;
+        const len=Math.hypot(dx,dy);
+        if(len>0){
+          p.x = Math.max(0, Math.min(p.x + dx/len*this.speed*delta, engine.layers[1].width));
+          p.y = Math.max(0, Math.min(p.y + dy/len*this.speed*delta, engine.layers[1].height));
+        }
+      });
+    }
+    render(){} 
+  }
+
+  class RenderSystem {
+    render(engine){
+      const ctx = engine.ctx[1];
+      engine.entities.forEach(e=>{
+        const p=e.get('pos'), r=e.get('rend');
+        if(p&&r&&r.layer===1){
+          ctx.fillStyle=r.color;
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,r.r,0,2*Math.PI);
+          ctx.fill();
+          
+          // Add glitch effect for glitch entities
+          if(e.get('glitch')){
+            ctx.strokeStyle=varColor('--danger');
+            ctx.lineWidth=2;
+            ctx.stroke();
+          }
+        }
+      });
+    }
+  }
+
+  class SpawnSystem {
+    constructor(regionSize=200){
+      this.region=regionSize; this.lastID=null;
+    }
+    update(_,ents){
+      const player=[...ents].find(e=>e.get('player'));
+      if(!player) return;
+      const p=player.get('pos'),
+            rx=Math.floor(p.x/this.region),
+            ry=Math.floor(p.y/this.region),
+            id=rx*10000+ry;
+      if(id!==this.lastID){
+        this.lastID=id;
+        
+        // Spawn tokens
+        const tokenCount=1+Math.floor(Math.random()*3);
+        for(let i=0;i<tokenCount;i++){
+          const tx=rx*this.region + Math.random()*this.region;
+          const ty=ry*this.region + Math.random()*this.region;
+          const tok=new Entity()
+            .add(new CPosition(tx,ty))
+            .add(new CRenderable(varColor('--token'),8,1))
+            .add(new CToken());
+          engine.addEntity(tok);
+        }
+        
+        // Spawn shards (rarer)
+        if(Math.random() < 0.3){
+          const sx=rx*this.region + Math.random()*this.region;
+          const sy=ry*this.region + Math.random()*this.region;
+          const shard=new Entity()
+            .add(new CPosition(sx,sy))
+            .add(new CRenderable(varColor('--shard'),12,1))
+            .add(new CShard());
+          engine.addEntity(shard);
+        }
+        
+        // Spawn scrolls (audit bonuses)
+        if(Math.random() < 0.15){
+          const scrx=rx*this.region + Math.random()*this.region;
+          const scry=ry*this.region + Math.random()*this.region;
+          const scroll=new Entity()
+            .add(new CPosition(scrx,scry))
+            .add(new CRenderable('#f39c12',6,1))
+            .add(new CScroll());
+          engine.addEntity(scroll);
+        }
+        
+        // Spawn glitches when ethics are low or entropy high
+        if(state.er < 0.3 || state.entropy > 0.8){
+          if(Math.random() < 0.4){
+            const gx=rx*this.region + Math.random()*this.region;
+            const gy=ry*this.region + Math.random()*this.region;
+            const glitch=new Entity()
+              .add(new CPosition(gx,gy))
+              .add(new CRenderable(varColor('--danger'),20,1))
+              .add(new CGlitch());
+            engine.addEntity(glitch);
+            log("⚠️ Ethics breach detected - Glitch entity spawned!");
+          }
+        }
+      }
+    }
+    render(){} 
+  }
+
+  class PickupSystem {
+    update(_,ents){
+      const player=[...ents].find(e=>e.get('player'));
+      if(!player) return;
+      const pp=player.get('pos');
+      [...ents].forEach(e=>{
+        const ep=e.get('pos');
+        if(!ep) return;
+        
+        const dist = Math.hypot(pp.x-ep.x, pp.y-ep.y);
+        
+        // Token pickup
+        if(e.get('tok') && dist < 16+8){
+          engine.removeEntity(e);
+          state.ent++;
+          updateSidebar(); flashPanel('panel-entropy');
+          questSys.updateProgress('collect');
+        }
+        
+        // Shard pickup
+        if(e.get('shard') && dist < 16+12){
+          engine.removeEntity(e);
+          state.shard++;
+          updateSidebar(); flashPanel('panel-hash');
+          log("💎 Shard fragment acquired!");
+        }
+        
+        // Scroll pickup
+        if(e.get('scroll') && dist < 16+6){
+          engine.removeEntity(e);
+          state.audit++;
+          updateSidebar();
+          log("📜 Audit scroll obtained - enhances next audit!");
+        }
+        
+        // Glitch combat
+        if(e.get('glitch') && dist < 16+20){
+          const glitch = e.get('glitch');
+          glitch.hp--;
+          if(glitch.hp <= 0){
+            engine.removeEntity(e);
+            state.hp = Math.max(0, state.hp - 10);
+            state.er = Math.min(1, state.er + 0.05); // Fighting glitches improves ethics
+            updateSidebar(); glitchPanel('panel-ethics');
+            log("⚔️ Glitch entity purged - Ethics stabilizing");
+          } else {
+            state.hp = Math.max(0, state.hp - 5);
+            updateSidebar();
+            log(`💥 Glitch damaged! (${glitch.hp} HP remaining)`);
+          }
+        }
+      });
+    }
+    render(){} 
+  }
+
+  class EthicsSystem {
+    constructor(){
+      this.cd=0; this.intv=20;
+    }
+    update(dt){
+      this.cd-=dt;
+      if(this.cd<=0){
+        this.cd=this.intv + Math.random()*this.intv;
+        this.triggerStorm();
+      }
+    }
+    triggerStorm(){
+      const stormType = Math.random();
+      let message, effect;
+      
+      if(stormType < 0.3){
+        message = "⚖️ Ethics Storm: Accept variance in system parameters?";
+        effect = confirm(message);
+        state.er = effect ? Math.min(1,state.er+0.1) : Math.max(0,state.er-0.1);
+      } else if(stormType < 0.6){
+        message = "🌊 Data storm detected: Sacrifice 10 tokens for stability?";
+        effect = confirm(message);
+        if(effect && state.ent >= 10){
+          state.ent -= 10;
+          state.er = Math.min(1, state.er + 0.15);
+          log("💫 Token sacrifice accepted - Major ethics boost!");
+        } else {
+          state.er = Math.max(0, state.er - 0.05);
+        }
+      } else {
+        message = "🔮 Quantum fluctuation: Realign core values?";
+        effect = confirm(message);
+        if(effect){
+          state.mp = Math.min(50, state.mp + 10);
+          state.er = Math.min(1, state.er + 0.08);
+        } else {
+          state.mp = Math.max(0, state.mp - 5);
+        }
+      }
+      
+      updateSidebar(); flashPanel('panel-ethics');
+      log(`🌀 Ethics storm resolved: ${effect ? 'Accepted' : 'Rejected'}`);
+    }
+    render(){} 
+  }
+
+  class AuditSystem {
+    constructor(){
+      this.cd=0; this.intv=12;
+    }
+    update(dt){
+      this.cd-=dt;
+      if(this.cd<=0){
+        this.cd=this.intv;
+        this.doAudit();
+      }
+    }
+    async doAudit(){
+      flashPanel('panel-coeff'); log("🔍 Audit cycle initiating…");
+      await new Promise(r=>setTimeout(r,300));
+      
+      // Base audit values
+      let yIncrease = 0.001;
+      let energyBonus = 0;
+      let entropyReduction = 0;
+      
+      // Audit scroll bonuses
+      if(state.audit > 0){
+        yIncrease *= (1 + state.audit * 0.5);
+        energyBonus = state.audit * 0.1;
+        entropyReduction = state.audit * 0.01;
+        log(`📜 Audit scrolls activated! (${state.audit}x bonus)`);
+        state.audit = 0; // Consume scrolls
+      }
+      
+      const d = {
+        Y_unified: state.y + yIncrease,
+        quantumEnergy: Math.min(1, Math.random() + energyBonus),
+        entropyMetric: Math.max(0, Math.random()*0.02 - entropyReduction),
+        blockchainHash: '0x'+Math.random().toString(16).slice(2,10),
+        alignmentWarning: Math.random() < 0.1
+      };
+      
+      // Special hash effects
+      if(d.blockchainHash.includes('777') || d.blockchainHash.includes('000')){
+        state.mp = Math.min(50, state.mp + 20);
+        log("🎰 Rare hash detected - Quantum MP surge!");
+      }
+      
+      state.y = d.Y_unified;
+      state.energy = d.quantumEnergy;
+      state.entropy = d.entropyMetric;
+      state.hash = d.blockchainHash;
+      
+      if(d.alignmentWarning){
+        state.er = Math.max(0,state.er-0.1);
+        log("⚠️ Alignment warning detected!");
+      } else {
+        state.hp = Math.min(100,state.hp+2);
+      }
+      
+      updatePanels(); updateSidebar();
+      log(`✅ Audit complete (Y=${d.Y_unified.toFixed(6)})`);
+      questSys.updateProgress('audit');
+    }
+    render(){} 
+  }
+
+  class MinimapSystem {
+    constructor(canvas,engine){
+      this.ctx=canvas.getContext('2d');
+      this.engine=engine; this.w=canvas.width; this.h=canvas.height;
+    }
+    update(){ this.render(); }
+    render(){
+      const ctx=this.ctx, ents=this.engine.entities;
+      ctx.fillStyle=varColor('--bg'); ctx.fillRect(0,0,this.w,this.h);
+      
+      ents.forEach(e=>{
+        const p=e.get('pos');
+        if(!p) return;
+        
+        const mx = p.x/engine.layers[1].width*this.w;
+        const my = p.y/engine.layers[1].height*this.h;
+        
+        if(e.get('tok')){
+          ctx.fillStyle=varColor('--token');
+          ctx.fillRect(mx-1,my-1,2,2);
+        } else if(e.get('shard')){
+          ctx.fillStyle=varColor('--shard');
+          ctx.fillRect(mx-2,my-2,4,4);
+        } else if(e.get('scroll')){
+          ctx.fillStyle='#f39c12';
+          ctx.fillRect(mx-1,my-1,2,2);
+        } else if(e.get('glitch')){
+          ctx.fillStyle=varColor('--danger');
+          ctx.fillRect(mx-2,my-2,4,4);
+        }
+      });
+      
+      const pl=[...ents].find(e=>e.get('player'));
+      if(pl){
+        const p=pl.get('pos');
+        ctx.fillStyle=varColor('--accent');
+        ctx.beginPath();
+        ctx.arc(p.x/engine.layers[1].width*this.w,
+                p.y/engine.layers[1].height*this.h,4,0,2*Math.PI);
+        ctx.fill();
+      }
+    }
+  }
+
+  //—— Quests ——//
+  const questData = [
+    {id:'q1',desc:'Collect 5 Entropy Tokens',type:'collect', target:5, progress:0, done:false},
+    {id:'q2',desc:'Seal 3 Shards',          type:'seal',    target:3, progress:0, done:false},
+    {id:'q3',desc:'Run 10 Audits',           type:'audit',   target:10,progress:0, done:false}
+  ];
+  class QuestSystem {
+    constructor(quests){
+      this.quests=quests;
+      this.ui=document.getElementById('quest-list');
+      this.render();
+    }
+    render(){
+      this.ui.innerHTML='';
+      this.quests.forEach(q=>{
+        const li=document.createElement('li');
+        li.id=q.id;
+        li.textContent=`${q.desc} (${q.progress}/${q.target})`;
+        if(q.done) li.style.textDecoration='line-through';
+        this.ui.append(li);
+      });
+    }
+    updateProgress(type,amt=1){
+      this.quests.forEach(q=>{
+        if(q.type===type && !q.done){
+          q.progress=Math.min(q.target,q.progress+amt);
+          if(q.progress>=q.target){
+            q.done=true;
+            log(`✅ Quest Complete: ${q.desc}`);
+          }
+        }
+      });
+      this.render();
+    }
+  }
+
+  //—— Initialize Engine ——//
+  const W=1280,H=720;
+  const engine=new Engine(W,H);
+  const fs=new FractalSystem(), ms=new MovementSystem(),
+        sp=new SpawnSystem(), pk=new PickupSystem(),
+        es=new EthicsSystem(), au=new AuditSystem(),
+        mm=new MinimapSystem(document.getElementById('minimap'),engine);
+  engine.addSystem(fs);
+  engine.addSystem(ms);
+  engine.addSystem(sp);
+  engine.addSystem(pk);
+  engine.addSystem(new RenderSystem());
+  engine.addSystem(es);
+  engine.addSystem(au);
+  engine.addSystem(mm);
+
+  //—— Player Entity ——//
+  const player=new Entity()
+    .add(new CPosition(W/2,H/2))
+    .add(new CRenderable(varColor('--accent'),16,1))
+    .add(new CPlayer());
+  engine.addEntity(player);
+
+  //—— State & UI ——//
+  let state={hp:100,mp:50,er:0.75,ent:0,shard:0,audit:0,
+             y:0,energy:0,entropy:0,hash:'0x000…000'};
+  const panels = {
+    coeff:'#ui-coeff', energy:'#ui-energy',
+    entropy:'#ui-entropy', ethics:'#ui-ethics',
+    hash:'#ui-hash',
+    stats:{hp:'#stat-hp', mp:'#stat-mp', er:'#stat-er', 
+           ent:'#inv-ent', shard:'#inv-shard', audit:'#inv-audit'}
+  };
+  function updateSidebar(){
+    document.querySelector(panels.stats.hp).textContent=`${state.hp}/100`;
+    document.querySelector(panels.stats.mp).textContent=`${state.mp}/50`;
+    document.querySelector(panels.stats.er).textContent=`${Math.round(state.er*100)}%`;
+    document.querySelector(panels.stats.ent).textContent=state.ent;
+    document.querySelector(panels.stats.shard).textContent=state.shard;
+    document.querySelector(panels.stats.audit).textContent=state.audit;
+    
+    // Update button states
+    document.getElementById('btn-shard').disabled = state.shard === 0;
+  }
+  function updatePanels(){
+    document.querySelector(panels.coeff).textContent=state.y.toFixed(6);
+    document.querySelector(panels.energy).textContent=state.energy.toFixed(3);
+    document.querySelector(panels.entropy).textContent=state.entropy.toFixed(3);
+    document.querySelector(panels.ethics).textContent=state.er>0.5?'Stable':'Warning';
+    document.querySelector(panels.hash).textContent=state.hash;
+    
+    // Add warning styling
+    const ethicsPanel = document.getElementById('panel-ethics');
+    if(state.er <= 0.3){
+      ethicsPanel.classList.add('warning');
+    } else {
+      ethicsPanel.classList.remove('warning');
+    }
+  }
+  function log(txt){
+    const li=document.createElement('li');
+    li.textContent=txt;
+    const logList = document.getElementById('log-list');
+    logList.append(li);
+    // Keep only last 10 log entries
+    while(logList.children.length > 10){
+      logList.removeChild(logList.firstChild);
+    }
+    li.scrollIntoView();
+  }
+  const questSys = new QuestSystem(questData);
+
+  //—— Controls & Hooks ——//
+  document.getElementById('rate-slider').addEventListener('input',e=>{
+    speedRate=parseFloat(e.target.value);
+    document.getElementById('rate-value').textContent=speedRate.toFixed(1)+'×';
+  });
+  dragify(document.getElementById('panel-coeff'));
+  dragify(document.getElementById('panel-energy'));
+  dragify(document.getElementById('panel-ethics'));
+  dragify(document.getElementById('panel-entropy'));
+  dragify(document.getElementById('panel-hash'));
+
+  document.getElementById('btn-audit').onclick = ()=> au.doAudit();
+  document.getElementById('btn-purge').onclick = ()=>{
+    const cost = Math.floor(state.ent * 0.1);
+    if(cost > 0){
+      state.ent = Math.max(0, state.ent - cost);
+      state.hp = Math.min(100, state.hp + cost * 2);
+      log(`🧹 Legacy purged: -${cost} tokens, +${cost*2} integrity`);
+    } else {
+      state.ent=0; 
+      log('🧹 All tokens purged');
+    }
+    updateSidebar();
+  };
+  document.getElementById('btn-shard').onclick = ()=>{
+    if(state.shard > 0){
+      state.shard--;
+      state.mp = Math.min(50, state.mp + 15);
+      updateSidebar(); flashPanel('panel-energy');
+      log('🛡️ Shard sealed - Quantum MP restored');
+      questSys.updateProgress('seal');
+    }
+  };
+  document.getElementById('btn-ethics').onclick = ()=> es.triggerStorm();
+
+  //—— Start ——//
+  engine.start();
+  updateSidebar(); updatePanels();
+  log("🚀 UCCI AXIS-Δ13 Engine online");
+  log("📍 Use WASD/arrows to navigate");
+  log("🎯 Collect tokens, shards, and scrolls");
+  </script>
+</body>
+</html>
