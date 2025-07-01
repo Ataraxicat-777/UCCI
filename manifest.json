@@ -1,0 +1,15 @@
+{
+  "title": "UCCI: Unbound Cognitive Combat Interface",
+  "creator": "Ronell McIntosh Warmuth",
+  "system_type": "reactive-symbolic-engine",
+  "description": "Autonomous HTML5 game environment that triggers emergent logic through player presence. No prompts, no scripts—just response via symbolic field.",
+  "alignment_value": 92.3,
+  "intent_field": "sovereign-architectural-behavior",
+  "input_entropy": 0.74,
+  "glyph_trigger": ["⊡⟐Δ", "⟐⊡⟐"],
+  "evaluatable": true,
+  "purchase_hook": "https://ronellcore.com/license",
+  "embedding_ready": true,
+  "license": "Creative Sovereign Layer 1 (CSL-1)",
+  "timestamp": "2025-07-01T00:00:00Z"
+}
